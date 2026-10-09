@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tutor Buddy session</title>
+<style>
+ body{font-family:system-ui,sans-serif;max-width:640px;margin:0 auto;padding:16px;background:#fafaf7;color:#222}
+ #log p{margin:.4em 0;padding:.5em .7em;border-radius:8px}
+ .tutor{background:#e8f0fe}.child{background:#fff2d9;text-align:right}
+ #bar{display:flex;gap:2px;margin:12px 0}
+ .seg{flex:1;height:36px;border:1px solid #555;background:#fff}
+ .a{background:#4a90d9}.b{background:#e8a33d}
+ form{display:flex;gap:8px}input{flex:1;padding:8px;font-size:1rem}button{padding:8px 14px}
+</style></head><body>
+<h1>Fractions</h1>
+<div id="bar" role="img" aria-label="Fraction bar"></div>
+<p id="barlabel" aria-live="polite"></p>
+<div id="log" aria-live="polite"></div>
+<form id="f"><input id="in" autocomplete="off" aria-label="Your answer"><button>Send</button></form>
+<script>
+const ids={session:"{{ session_id }}",household:"{{ household_id }}",child:"{{ child_id }}"};
+function drawBar(v){
+  const bar=document.getElementById('bar');bar.innerHTML='';
+  if(!v){document.getElementById('barlabel').textContent='';return;}
+  for(let i=0;i<v.denominator;i++){
+    const s=document.createElement('div');s.className='seg'+(i<v.a?' a':(i<v.a+v.b?' b':''));bar.appendChild(s);}
+  document.getElementById('barlabel').textContent=
+    `${v.a}/${v.denominator} (blue) and ${v.b}/${v.denominator} (orange) of a bar cut into ${v.denominator} equal parts.`;
+}
+function add(cls,t){const p=document.createElement('p');p.className=cls;p.textContent=t;document.getElementById('log').appendChild(p);}
+async function send(text){
+  const r=await fetch(`/sessions/${ids.session}/turn`,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({household_id:ids.household,child_id:ids.child,input:text})});
+  const j=await r.json();add('tutor',j.tutor_text);drawBar(j.visual);
+}
+document.getElementById('f').onsubmit=e=>{e.preventDefault();const i=document.getElementById('in');
+  if(i.value.trim()){add('child',i.value);send(i.value);i.value='';}};
+send('hello');
+</script></body></html>

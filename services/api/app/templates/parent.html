@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Parent view</title>
+<style>body{font-family:system-ui,sans-serif;max-width:640px;margin:0 auto;padding:16px}
+section{border:1px solid #ccc;border-radius:8px;padding:8px 12px;margin:10px 0}</style></head><body>
+<h1>Parent view</h1>
+<form id="f"><input id="h" placeholder="household id" size="40"><br><input id="c" placeholder="child id" size="40"><button>Load</button></form>
+<div id="out"></div>
+<script>
+document.getElementById('f').onsubmit=async e=>{e.preventDefault();
+ const r=await fetch(`/parent/${h.value}/${c.value}`);const j=await r.json();
+ const li=a=>a.length?a.map(x=>`<li>${x.when.slice(0,10)} – ${x.kind}</li>`).join(''):'<li>none yet</li>';
+ out.innerHTML=`<h2>${j.child}</h2>
+ <section><h3>Independent work (no in-app help)</h3><ul>${li(j.independent_evidence)}</ul></section>
+ <section><h3>Supported work (with hints)</h3><ul>${li(j.assisted_evidence)}</ul></section>
+ <section><h3>Skill status</h3><ul>${j.skills.map(s=>`<li>${s.skill}: ${s.status} (${s.independent_successes} independent)</li>`).join('')||'<li>none yet</li>'}</ul></section>
+ <p><em>${j.note}</em></p>`;};
+</script></body></html>

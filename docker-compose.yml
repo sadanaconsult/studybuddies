@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tutorbuddy
+      POSTGRES_PASSWORD: tutorbuddy
+      POSTGRES_DB: tutorbuddy
+    ports:
+      - "5432:5432"
+    volumes:
+      - tutorbuddy_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tutorbuddy"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  tutorbuddy_pgdata:
