@@ -14,6 +14,7 @@
 <div id="bar" role="img" aria-label="Fraction bar"></div>
 <p id="barlabel" aria-live="polite"></p>
 <div id="log" aria-live="polite"></div>
+<p><label><input type="checkbox" id="speak"> Read tutor replies aloud</label> <button type="button" id="mic">🎤 Speak answer</button></p>
 <form id="f"><input id="in" autocomplete="off" aria-label="Your answer"><button>Send</button></form>
 <script>
 const ids={session:"{{ session_id }}",household:"{{ household_id }}",child:"{{ child_id }}"};
@@ -30,8 +31,17 @@ async function send(text){
   const r=await fetch(`/sessions/${ids.session}/turn`,{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({household_id:ids.household,child_id:ids.child,input:text})});
   const j=await r.json();add('tutor',j.tutor_text);drawBar(j.visual);
+  // Voice: browser speech synthesis only reads the already-gated text (AGENTS.md rule 2).
+  if(document.getElementById('speak').checked&&'speechSynthesis' in window){
+    speechSynthesis.cancel();speechSynthesis.speak(new SpeechSynthesisUtterance(j.tutor_text));}
 }
 document.getElementById('f').onsubmit=e=>{e.preventDefault();const i=document.getElementById('in');
   if(i.value.trim()){add('child',i.value);send(i.value);i.value='';}};
+// Speech-to-text fills the input for the child to confirm; it is never auto-submitted,
+// so a mis-heard answer cannot become evidence unreviewed.
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+const mic=document.getElementById('mic');
+if(!SR){mic.disabled=true;mic.title='Speech input not supported in this browser';}
+else{mic.onclick=()=>{const r=new SR();r.lang='en-GB';r.onresult=e=>{document.getElementById('in').value=e.results[0][0].transcript;};r.start();};}
 send('hello');
 </script></body></html>

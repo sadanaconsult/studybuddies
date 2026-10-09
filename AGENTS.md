@@ -87,7 +87,7 @@ stubbed or deliberately absent.
 - Real guardian/child authentication (a minimal stub session exists only
   to demonstrate the household/child boundary).
 - Safeguarding escalation beyond the fixed safe response in rule 9.
-- Voice input/output (named stretch goal, sequenced last, not started).
+- Provider-grade voice (a browser-only voice layer exists: speech-to-text fills the answer box for the child to confirm; text-to-speech reads gated replies).
 - Any subject or skill other than same-denominator fraction addition.
 
 ## Provenance

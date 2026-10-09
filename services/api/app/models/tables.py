@@ -94,6 +94,7 @@ class TutoringSession(Base):
     skill_id: Mapped[str] = mapped_column(String(64), default="fraction_addition_same_denominator")
     state: Mapped[str] = mapped_column(String(32), default="orient")
     current_turn_sequence: Mapped[int] = mapped_column(Integer, default=0)
+    hint_level: Mapped[int] = mapped_column(Integer, default=0)
     baseline_item_json: Mapped[dict] = mapped_column(JSONB, default=dict)
     transfer_item_json: Mapped[dict] = mapped_column(JSONB, default=dict)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from .core.db import get_db
+from .core.evidence import invalidate_evidence
 from .core.session_service import ScopeError, get_scoped_session, process_turn, start_session
 from .models.tables import ChildProfile, LearningEvidence, MemoryFact, SkillState
 
@@ -116,3 +117,26 @@ def parent_data(household_id: uuid.UUID, child_id: uuid.UUID, db: Session = Depe
 @app.get("/parent", response_class=HTMLResponse)
 def parent_page(request: Request):
     return templates.TemplateResponse(request, "parent.html", {})
+
+
+class CorrectBody(BaseModel):
+    household_id: uuid.UUID
+    child_id: uuid.UUID
+    evidence_id: uuid.UUID
+
+
+@app.post("/evidence/correct")
+def correct_evidence(body: CorrectBody, db: Session = Depends(get_db)):
+    """Invalidate one evidence row (e.g. mis-transcribed answer). Scoped."""
+    row = (
+        db.query(LearningEvidence)
+        .filter(LearningEvidence.id == body.evidence_id,
+                LearningEvidence.household_id == body.household_id,
+                LearningEvidence.child_id == body.child_id)
+        .one_or_none()
+    )
+    if row is None:
+        raise HTTPException(404, "evidence not found")
+    invalidate_evidence(db, row.id)
+    db.commit()
+    return {"invalidated": str(row.id)}

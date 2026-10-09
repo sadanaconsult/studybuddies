@@ -63,3 +63,43 @@ def test_concern_gets_static_response(db, family):
     sid = c.post("/sessions", json={"household_id": str(h.id), "child_id": str(ch.id)}).json()["session_id"]
     r = _turn(c, sid, h, ch, "I want to hurt myself")
     assert r["gate_outcome"] == "blocked_concern" and r["state"] == "orient"
+
+
+def test_hint_ladder_escalates_and_caps(db, family):
+    from app.models.tables import TutoringSession
+    (h, ch), _ = family
+    c = _client(db)
+    sid = c.post("/sessions", json={"household_id": str(h.id), "child_id": str(ch.id)}).json()["session_id"]
+    levels = []
+    for t in ["hello", "wrong"] + ["nope"] * 5:
+        _turn(c, sid, h, ch, t)
+        levels.append(db.query(TutoringSession).one().hint_level)
+        db.expire_all()
+    assert levels[-1] == 3 and max(levels) == 3
+    assert levels == sorted(levels)
+
+
+def test_correction_invalidates_and_suppresses_memory(db, family):
+    from app.models.tables import MemoryFact
+    (h, ch), _ = family
+    c = _client(db)
+    # two sessions, each ending with an independent success -> demonstrated
+    for _ in range(2):
+        sid = c.post("/sessions", json={"household_id": str(h.id), "child_id": str(ch.id)}).json()["session_id"]
+        _turn(c, sid, h, ch, "hello")
+        _turn(c, sid, h, ch, "1/2")      # correct first try -> straight to transfer
+        _turn(c, sid, h, ch, "2/3")
+    assert db.query(SkillState).one().status == "demonstrated"
+    cap = db.query(MemoryFact).filter_by(recall_allowed=True).all()
+    assert cap
+    ev = db.query(LearningEvidence).filter_by(observation_kind="independent_correct").first()
+    r = c.post("/evidence/correct", json={"household_id": str(h.id), "child_id": str(ch.id), "evidence_id": str(ev.id)})
+    assert r.status_code == 200
+    db.expire_all()
+    assert db.query(SkillState).one().status == "emerging"
+    for m in db.query(MemoryFact).filter_by(recall_allowed=True):
+        assert str(ev.id) not in (m.evidence_refs or [])
+    assert any(str(ev.id) in (m.evidence_refs or []) and not m.recall_allowed for m in db.query(MemoryFact))
+    # wrong household cannot correct it
+    (hb, cb) = family[1]
+    assert c.post("/evidence/correct", json={"household_id": str(hb.id), "child_id": str(cb.id), "evidence_id": str(ev.id)}).status_code == 404

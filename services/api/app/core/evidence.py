@@ -88,6 +88,15 @@ def invalidate_evidence(db: Session, evidence_id: uuid.UUID) -> None:
         raise KeyError(f"no learning_evidence row {evidence_id}")
     row.invalidated_at = datetime.now(timezone.utc)
     db.flush()
+    # Immediate suppression: any memory fact citing this evidence stops
+    # being recallable (doc 03: suppress on correction).
+    for fact in db.query(MemoryFact).filter(
+        MemoryFact.household_id == row.household_id, MemoryFact.child_id == row.child_id,
+        MemoryFact.recall_allowed.is_(True),
+    ):
+        if str(evidence_id) in (fact.evidence_refs or []):
+            fact.recall_allowed = False
+    db.flush()
     _recompute_skill_state(db, household_id=row.household_id, child_id=row.child_id, skill_id=row.skill_id)
 
 

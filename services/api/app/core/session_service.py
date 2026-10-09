@@ -119,7 +119,6 @@ def _visual_for(item: GeneratedItem) -> dict:
 def process_turn(db: Session, s: TutoringSession, child_input: str) -> TurnResponse:
     baseline = _item_from_json(s.baseline_item_json)
     transfer = _item_from_json(s.transfer_item_json)
-    hint_level = s.__dict__.get("_hint_level", 0)
     intent = classify_intent_heuristic(child_input)
     state_before = s.state
 
@@ -160,7 +159,8 @@ def process_turn(db: Session, s: TutoringSession, child_input: str) -> TurnRespo
         s.state = machine.state
 
     if s.state == "teach_or_hint" and state_before != "learner_try":
-        result = generate_tutor_turn(state=s.state, child_input=child_input, item=baseline, hint_level=1)
+        s.hint_level = max(s.hint_level, 1)
+        result = generate_tutor_turn(state=s.state, child_input=child_input, item=baseline, hint_level=s.hint_level)
         machine.state = s.state
         machine.transition("learner_try")
         s.state = machine.state
@@ -181,7 +181,8 @@ def process_turn(db: Session, s: TutoringSession, child_input: str) -> TurnRespo
             return TurnResponse(text, s.state, "approved", verification, _visual_for(transfer))
         machine.transition("teach_or_hint")
         s.state = "learner_try"  # allow another try after a bigger hint
-        result = generate_tutor_turn(state="teach_or_hint", child_input=child_input, item=baseline, hint_level=2)
+        s.hint_level = min(s.hint_level + 1, 3)  # hint ladder escalates per wrong assisted try
+        result = generate_tutor_turn(state="teach_or_hint", child_input=child_input, item=baseline, hint_level=s.hint_level)
         d = result.gate_decision
         _log_turn(db, s, speaker="tutor", state=s.state, raw=result.raw_model_output, gated=d.output_text, outcome=d.outcome)
         return TurnResponse(d.output_text, s.state, d.outcome, verification, _visual_for(baseline))
