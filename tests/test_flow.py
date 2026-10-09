@@ -118,3 +118,14 @@ def test_demo_password_gate(db, monkeypatch):
 def test_db_url_normalised():
     from app.core.config import Settings
     assert Settings(database_url="postgres://u:p@h/db").database_url == "postgresql+psycopg://u:p@h/db"
+
+
+def test_demo_home_flow(db):
+    c = _client(db)
+    assert c.get("/").status_code == 200
+    r = c.post("/demo/start", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"].startswith("/session/")
+    page = c.get(r.headers["location"])
+    assert page.status_code == 200 and "Fraction bar" in page.text
+    p = c.get("/demo/parent", follow_redirects=False)
+    assert p.status_code == 303 and p.headers["location"].startswith("/parent?household_id=")

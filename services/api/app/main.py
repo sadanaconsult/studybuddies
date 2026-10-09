@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -16,7 +16,7 @@ from .core.config import settings
 from .core.db import Base, engine, get_db
 from .core.evidence import invalidate_evidence
 from .core.session_service import ScopeError, get_scoped_session, process_turn, start_session
-from .models.tables import ChildProfile, LearningEvidence, MemoryFact, SkillState
+from .models.tables import ChildProfile, GuardianMembership, Household, LearningEvidence, MemoryFact, SkillState
 
 BASE = Path(__file__).parent
 app = FastAPI(title="Tutor Buddy prototype (fraction addition)")
@@ -175,3 +175,39 @@ def correct_evidence(body: CorrectBody, db: Session = Depends(get_db)):
     invalidate_evidence(db, row.id)
     db.commit()
     return {"invalidated": str(row.id)}
+
+
+def _demo_child(db: Session) -> ChildProfile:
+    """The single synthetic demo child; created on first use."""
+    child = db.query(ChildProfile).order_by(ChildProfile.created_at.asc()).first()
+    if child is None:
+        h = Household()
+        db.add(h)
+        db.flush()
+        db.add(GuardianMembership(household_id=h.id, adult_label="Synthetic Guardian A"))
+        child = ChildProfile(household_id=h.id, display_name="Synthetic Child A",
+                             age_band="9-10", school_year_label="Year 5")
+        db.add(child)
+        db.flush()
+    return child
+
+
+@app.get("/", response_class=HTMLResponse)
+def home(request: Request):
+    return templates.TemplateResponse(request, "home.html", {})
+
+
+@app.post("/demo/start")
+def demo_start(db: Session = Depends(get_db)):
+    child = _demo_child(db)
+    s = start_session(db, household_id=child.household_id, child_id=child.id, canonical=True)
+    db.commit()
+    return RedirectResponse(
+        f"/session/{s.id}?household_id={child.household_id}&child_id={child.id}", status_code=303)
+
+
+@app.get("/demo/parent")
+def demo_parent(db: Session = Depends(get_db)):
+    child = _demo_child(db)
+    db.commit()
+    return RedirectResponse(f"/parent?household_id={child.household_id}&child_id={child.id}", status_code=303)

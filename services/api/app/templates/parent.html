@@ -15,4 +15,6 @@ document.getElementById('f').onsubmit=async e=>{e.preventDefault();
  <section><h3>Supported work (with hints)</h3><ul>${li(j.assisted_evidence)}</ul></section>
  <section><h3>Skill status</h3><ul>${j.skills.map(s=>`<li>${s.skill}: ${s.status} (${s.independent_successes} independent)</li>`).join('')||'<li>none yet</li>'}</ul></section>
  <p><em>${j.note}</em></p>`;};
+const q=new URLSearchParams(location.search);
+if(q.get('household_id')&&q.get('child_id')){h.value=q.get('household_id');c.value=q.get('child_id');f.requestSubmit();}
 </script></body></html>

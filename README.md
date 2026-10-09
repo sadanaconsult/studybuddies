@@ -42,7 +42,7 @@ uvicorn app.main:app --reload --port 8000
 # tests (needs the db above): cd ../.. && python -m pytest
 ```
 
-Then `POST /sessions` (see `/docs`) with the seeded ids, open
+Open `/` for the home page: "Start a lesson" opens the child page (fraction bar + chat) for the demo child, and "Open parent view" shows the evidence. The demo child is created on first use. (`/docs` still lists the raw API.)
 `/session/{session_id}?household_id=...&child_id=...` for the child page
 (fraction bar + chat), and `/parent` for the parent view.
 
