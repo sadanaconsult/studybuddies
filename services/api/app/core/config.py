@@ -6,6 +6,7 @@ demo. Do not treat this module as a model for production config handling.
 """
 from __future__ import annotations
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +23,18 @@ class Settings(BaseSettings):
     # AGENTS.md rule 6: no unsafe fallback provider — this is the safe
     # fallback, not a convenience toggle to be routed around.
     safe_mode_only: bool = False
+    # Shared demo password (HTTP basic auth, any username). If unset, the
+    # app is open -- fine locally, not for a public URL.
+    demo_password: str | None = None
+
+    @field_validator("database_url")
+    @classmethod
+    def _normalise_db_url(cls, v: str) -> str:
+        # Render/Heroku-style URLs use postgres:// or postgresql://
+        for prefix in ("postgres://", "postgresql://"):
+            if v.startswith(prefix):
+                return "postgresql+psycopg://" + v[len(prefix):]
+        return v
 
 
 settings = Settings()

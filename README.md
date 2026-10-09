@@ -55,3 +55,14 @@ rule 6) — useful for running the deterministic parts of the demo offline.
 Prototype / pre-review. Educational validity, safeguarding behaviour, and
 legal/privacy posture have **not** been signed off by a specialist; that
 review is the next step, owned by the product owner, not this codebase.
+
+## Deploying a demo on Render
+
+`render.yaml` defines a free Postgres database and a web service.
+
+1. Render dashboard → New → Blueprint → select this repo.
+2. When prompted, set `ANTHROPIC_API_KEY` (from console.anthropic.com) and `DEMO_PASSWORD` (any shared password; the browser will ask for it, username can be anything).
+3. After the first deploy, open the service's Shell and run `python scripts/seed.py` to create the one synthetic household/child and print their ids. Tables are also created automatically on startup.
+4. `POST /sessions` via `/docs` with those ids, then open `/session/{id}?household_id=...&child_id=...`.
+
+Set a monthly spend limit on the API key in the Console. Synthetic data only. The password is a demo gate, not real authentication.

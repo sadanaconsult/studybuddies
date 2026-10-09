@@ -1,22 +1,57 @@
 from __future__ import annotations
 
+import base64
+import secrets
 import uuid
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from .core.db import get_db
+from .core.config import settings
+from .core.db import Base, engine, get_db
 from .core.evidence import invalidate_evidence
 from .core.session_service import ScopeError, get_scoped_session, process_turn, start_session
 from .models.tables import ChildProfile, LearningEvidence, MemoryFact, SkillState
 
 BASE = Path(__file__).parent
 app = FastAPI(title="Tutor Buddy prototype (fraction addition)")
+
+
+@app.on_event("startup")
+def _create_tables() -> None:
+    from .models import tables  # noqa: F401  (register models)
+    Base.metadata.create_all(engine)
+
+
+@app.middleware("http")
+async def demo_password_gate(request: Request, call_next):
+    """Shared-password basic auth for demo deployments. Not real auth
+    (AGENTS.md: real guardian/child auth is out of scope)."""
+    if not settings.demo_password or request.url.path == "/healthz":
+        return await call_next(request)
+    header = request.headers.get("authorization", "")
+    ok = False
+    if header.lower().startswith("basic "):
+        try:
+            _, _, pw = base64.b64decode(header[6:]).decode().partition(":")
+            ok = secrets.compare_digest(pw, settings.demo_password)
+        except Exception:
+            ok = False
+    if ok:
+        return await call_next(request)
+    return Response(status_code=401, headers={"WWW-Authenticate": 'Basic realm="Tutor Buddy demo"'})
+
+
+@app.get("/healthz")
+def healthz():
+    return {"ok": True}
+
+
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE / "templates"))
 

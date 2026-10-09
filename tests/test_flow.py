@@ -103,3 +103,18 @@ def test_correction_invalidates_and_suppresses_memory(db, family):
     # wrong household cannot correct it
     (hb, cb) = family[1]
     assert c.post("/evidence/correct", json={"household_id": str(hb.id), "child_id": str(cb.id), "evidence_id": str(ev.id)}).status_code == 404
+
+
+def test_demo_password_gate(db, monkeypatch):
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "demo_password", "s3cret")
+    c = _client(db)
+    assert c.get("/healthz").status_code == 200
+    assert c.get("/parent").status_code == 401
+    assert c.get("/parent", auth=("x", "wrong")).status_code == 401
+    assert c.get("/parent", auth=("x", "s3cret")).status_code == 200
+
+
+def test_db_url_normalised():
+    from app.core.config import Settings
+    assert Settings(database_url="postgres://u:p@h/db").database_url == "postgresql+psycopg://u:p@h/db"
