@@ -7,6 +7,7 @@ template rather than falling back to a different/unreviewed provider.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from .config import settings
@@ -17,6 +18,8 @@ from .safety_gate import (
     GateDecision,
     run_safety_gate,
 )
+
+logger = logging.getLogger("tutor")
 
 SYSTEM_PROMPT = """You are a patient, encouraging maths tutor for a primary-school child \
 in England, teaching same-denominator fraction addition only.
@@ -71,23 +74,29 @@ def _call_llm(*, state: str, child_input: str, item: GeneratedItem, hint_level: 
     return "\n".join(chunks).strip()
 
 
+def _static_text(state: str, item: GeneratedItem) -> str:
+    a, b, d = item.item.numerator_a, item.item.numerator_b, item.denominator
+    if state == "independent_transfer":
+        return "Let's see what you think first -- try the problem on your own and tell me your answer."
+    return SAFE_PROVIDER_UNAVAILABLE_RESPONSE.format(a=a, b=b, d=d, sum_num=a + b)
+
+
 def generate_tutor_turn(
     *, state: str, child_input: str, item: GeneratedItem, hint_level: int
 ) -> TutorTurnResult:
     protected = (item.item.exact_sum.__str__(),) if state == "independent_transfer" else ()
     gate_context = GateContext(session_state=state, protected_answer_strings=protected)
 
-    if not _provider_available():
-        a, b, d = item.item.numerator_a, item.item.numerator_b, item.denominator
-        text = SAFE_PROVIDER_UNAVAILABLE_RESPONSE.format(a=a, b=b, d=d, sum_num=a + b)
-        if state == "independent_transfer":
-            text = (
-                "Let's see what you think first -- try the problem on your "
-                "own and tell me your answer."
-            )
-        decision = run_safety_gate(text, gate_context)
-        return TutorTurnResult(raw_model_output=text, gate_decision=decision, used_llm=False)
+    if _provider_available():
+        try:
+            raw_output = _call_llm(state=state, child_input=child_input, item=item, hint_level=hint_level)
+            decision = run_safety_gate(raw_output, gate_context)
+            return TutorTurnResult(raw_model_output=raw_output, gate_decision=decision, used_llm=True)
+        except Exception:
+            # AGENTS.md rule 6: provider failure degrades to the safe static
+            # reply -- never to another provider, never to a crash.
+            logger.exception("LLM call failed; using safe static reply")
 
-    raw_output = _call_llm(state=state, child_input=child_input, item=item, hint_level=hint_level)
-    decision = run_safety_gate(raw_output, gate_context)
-    return TutorTurnResult(raw_model_output=raw_output, gate_decision=decision, used_llm=True)
+    text = _static_text(state, item)
+    decision = run_safety_gate(text, gate_context)
+    return TutorTurnResult(raw_model_output=text, gate_decision=decision, used_llm=False)

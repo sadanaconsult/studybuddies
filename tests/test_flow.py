@@ -129,3 +129,18 @@ def test_demo_home_flow(db):
     assert page.status_code == 200 and "Fraction bar" in page.text
     p = c.get("/demo/parent", follow_redirects=False)
     assert p.status_code == 303 and p.headers["location"].startswith("/parent?household_id=")
+
+
+def test_llm_failure_falls_back_to_static(db, family, monkeypatch):
+    from app.core import tutor
+    monkeypatch.setattr(tutor.settings, "anthropic_api_key", "fake-key")
+    monkeypatch.setattr(tutor.settings, "safe_mode_only", False)
+    def boom(**kw):
+        raise RuntimeError("provider down")
+    monkeypatch.setattr(tutor, "_call_llm", boom)
+    (h, ch), _ = family
+    c = _client(db)
+    sid = c.post("/sessions", json={"household_id": str(h.id), "child_id": str(ch.id)}).json()["session_id"]
+    _turn(c, sid, h, ch, "hello")
+    r = _turn(c, sid, h, ch, "4/8")      # would have been a 500 before
+    assert r["state"] == "learner_try" and r["tutor_text"]

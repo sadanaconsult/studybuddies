@@ -30,6 +30,7 @@ function add(cls,t){const p=document.createElement('p');p.className=cls;p.textCo
 async function send(text){
   const r=await fetch(`/sessions/${ids.session}/turn`,{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({household_id:ids.household,child_id:ids.child,input:text})});
+  if(!r.ok){add('tutor',`Sorry, something went wrong (error ${r.status}). Please try again.`);return;}
   const j=await r.json();add('tutor',j.tutor_text);drawBar(j.visual);
   // Voice: browser speech synthesis only reads the already-gated text (AGENTS.md rule 2).
   if(document.getElementById('speak').checked&&'speechSynthesis' in window){
